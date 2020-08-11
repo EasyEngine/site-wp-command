@@ -27,14 +27,30 @@ Feature: Site Command
         | HTTP/1.1 200 OK  |
 
   Scenario: Create wp site successfully
-    When I run 'bin/ee site create wpcache.test --type=wp --cache'
+    When I run 'bin/ee site create wpcache.test --type=wp --cache --proxy-cache=on'
     Then After delay of 5 seconds
     And The site 'wpcache.test' should have webroot
     And The site 'wpcache.test' should have WordPress
     And Request on 'wpcache.test' should contain following headers:
-      | header           |
-      | HTTP/1.1 200 OK  |
-  
+      | header                 |
+      | HTTP/1.1 200 OK        |
+      | X-SRCache-Fetch-Status |
+      | X-Proxy-Cache          |
+
+  Scenario: Add alias domain
+    When I run 'bin/ee site update wpcache.test --add-alias-domains=alias.wpcache.test'
+    And I run '/bin/bash -c 'echo "127.0.0.1 alias.wpcache.test" >> /etc/hosts''
+    Then STDOUT should return something like
+    """
+    Success: Alias domains updated on site wpcache.test.
+    """
+      And After delay of 5 seconds
+      And Request on 'alias.wpcache.test' should contain following headers:
+        | header                 |
+        | HTTP/1.1 200 OK        |
+        | X-SRCache-Fetch-Status |
+        | X-Proxy-Cache          |
+
   Scenario: Create wpsubdir site successfully
     When I run 'bin/ee site create wpsubdir.test --type=wp --mu=subdir'
       And I create subsite '1' in 'wpsubdir.test'
@@ -85,3 +101,4 @@ Feature: Site Command
         | db         |
         | redis      |
         | phpmyadmin |
+
