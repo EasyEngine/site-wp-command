@@ -215,6 +215,9 @@ class WordPress extends EE_Site_Command {
 	 * [--yes]
 	 * : Do not prompt for confirmation.
 	 *
+	 * [--env-type]
+	 * : Environment type.
+	 *
 	 * [--force]
 	 * : Resets the remote database if it is not empty.
 	 *
@@ -308,6 +311,12 @@ class WordPress extends EE_Site_Command {
 		$this->site_data['proxy_cache']        = \EE\Utils\get_flag_value( $assoc_args, 'proxy-cache' );
 		$this->locale                          = \EE\Utils\get_flag_value( $assoc_args, 'locale', \EE::get_config( 'locale' ) );
 		$local_cache                           = \EE\Utils\get_flag_value( $assoc_args, 'with-local-redis' );
+		$this->env_type                        = \EE\Utils\get_flag_value( $assoc_args, 'env-type', '' );
+		$allowed_env_types = array( 'production', 'staging', 'development' );
+		if( ! empty( $this->env_type ) &&  ! in_array( $this->env_type, $allowed_env_types ) ) {
+			\EE::log( "Enviroment type " . $this->env_type . " is not allowed." );
+			$this->env_type = '';
+		}
 		$this->site_data['cache_host']         = '';
 		if ( 'on' === $this->site_data['proxy_cache'] ) {
 			$this->cache_type = true;
@@ -1196,6 +1205,10 @@ class WordPress extends EE_Site_Command {
 			$this->site_data['app_admin_password'],
 		] );
 
+		if( ! empty( $this->env_type ) ) {
+			\EE::log( "Configured Enviroment as " . $this->env_type . " site." );
+			EE::exec( 'docker-compose exec --user=\'www-data\' php wp config set --type=constant WP_ENVIRONMENT_TYPE  \'' . $this->env_type . '\' ' );
+		}
 		EE::exec( 'docker-compose exec php wp rewrite structure "/%year%/%monthnum%/%day%/%postname%/" --hard' );
 
 		if ( ! $core_install ) {
