@@ -103,7 +103,7 @@ class Site_WP_Docker {
 			],
 		];
 
-		$php['sysctls']  = sysctl_parameters();
+		$php['sysctls'] = sysctl_parameters();
 
 		$php['networks'] = [
 			'net' => [
@@ -156,10 +156,10 @@ class Site_WP_Docker {
 			$nginx['environment']['env'][] = [ 'name' => "SSL_POLICY=$ssl_policy" ];
 		}
 
-		$nginx['volumes']  = [
+		$nginx['volumes'] = [
 			'vol' => \EE_DOCKER::get_mounting_volume_array( $volumes['nginx'] ),
 		];
-		$nginx['labels']   = [
+		$nginx['labels']  = [
 			'label' => [
 				'name' => 'io.easyengine.site=${VIRTUAL_HOST}',
 			],
@@ -207,6 +207,12 @@ class Site_WP_Docker {
 		$postfix['image']        = [ 'name' => 'easyengine/postfix:' . $img_versions['easyengine/postfix'] ];
 		$postfix['hostname']     = [ 'name' => '${VIRTUAL_HOST}' ];
 		$postfix['restart']      = $restart_default;
+		$postfix['environment']  = [
+			'env' => [
+				[ 'name' => 'RELAY_HOST' ],
+				[ 'name' => 'REPLY_EMAIL' ],
+			],
+		];
 		$postfix['labels']       = [
 			'label' => [
 				'name' => 'io.easyengine.site=${VIRTUAL_HOST}',

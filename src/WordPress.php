@@ -94,7 +94,8 @@ class WordPress extends EE_Site_Command {
 	 * : Use redis cache for WordPress.
 	 *
 	 * [--vip]
-	 * : Create WordPress VIP GO site using your vip repo which contains wp-content dir. Default it will use skeleton repo.
+	 * : Create WordPress VIP GO site using your vip repo which contains wp-content dir. Default it will use skeleton
+	 * repo.
 	 * ---
 	 * default: https://github.com/Automattic/vip-go-skeleton.git
 	 * ---
@@ -131,12 +132,12 @@ class WordPress extends EE_Site_Command {
 	 * ---
 	 * default: latest
 	 * options:
-	 *	- 5.6
-	 *	- 7.0
-	 *	- 7.2
-	 *	- 7.3
-	 *	- 7.4
-	 *	- latest
+	 *    - 5.6
+	 *    - 7.0
+	 *    - 7.2
+	 *    - 7.3
+	 *    - 7.4
+	 *    - latest
 	 * ---
 	 *
 	 * [--dbname=<dbname>]
@@ -262,7 +263,7 @@ class WordPress extends EE_Site_Command {
 		$this->logger->debug( 'assoc_args:', empty( $assoc_args ) ? array( 'NULL' ) : $assoc_args );
 		$this->site_data['site_url'] = strtolower( \EE\Utils\remove_trailing_slash( $args[0] ) );
 
-		$mu = \EE\Utils\get_flag_value( $assoc_args, 'mu' );
+		$mu                              = \EE\Utils\get_flag_value( $assoc_args, 'mu' );
 		$this->site_data['app_sub_type'] = $mu ?? 'wp';
 
 		EE::log( 'Starting site creation.' );
@@ -300,7 +301,10 @@ class WordPress extends EE_Site_Command {
 		$this->site_data['app_admin_url']      = \EE\Utils\get_flag_value( $assoc_args, 'title', $this->site_data['site_url'] );
 		$this->site_data['app_admin_username'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-user', \EE\Utils\random_name_generator() );
 		$this->site_data['app_admin_password'] = \EE\Utils\get_flag_value( $assoc_args, 'admin-pass', '' );
-		$this->site_data['db_name']            = \EE\Utils\get_flag_value( $assoc_args, 'dbname', str_replace( [ '.', '-' ], '_', $this->site_data['site_url'] ) );
+		$this->site_data['db_name']            = \EE\Utils\get_flag_value( $assoc_args, 'dbname', str_replace( [
+			'.',
+			'-'
+		], '_', $this->site_data['site_url'] ) );
 		$this->site_data['db_host']            = \EE\Utils\get_flag_value( $assoc_args, 'dbhost', GLOBAL_DB );
 		$this->site_data['db_port']            = '3306';
 		$this->site_data['db_user']            = \EE\Utils\get_flag_value( $assoc_args, 'dbuser', $this->create_site_db_user( $this->site_data['site_url'] ) );
@@ -342,7 +346,12 @@ class WordPress extends EE_Site_Command {
 		}
 
 		$this->site_data['site_container_fs_path'] = get_public_dir( $assoc_args );
-		$this->site_data['site_ssl']               = get_value_if_flag_isset( $assoc_args, 'ssl', [ 'le', 'self', 'inherit', 'custom' ], 'le' );
+		$this->site_data['site_ssl']               = get_value_if_flag_isset( $assoc_args, 'ssl', [
+			'le',
+			'self',
+			'inherit',
+			'custom'
+		], 'le' );
 		if ( 'custom' === $this->site_data['site_ssl'] ) {
 			try {
 				$this->validate_site_custom_ssl( get_flag_value( $assoc_args, 'ssl-key' ), get_flag_value( $assoc_args, 'ssl-crt' ) );
@@ -356,7 +365,7 @@ class WordPress extends EE_Site_Command {
 		if ( ! empty( $alias_domains ) ) {
 			$comma_seprated_domains = explode( ',', $alias_domains );
 			foreach ( $comma_seprated_domains as $domain ) {
-				$trimmed_domain = trim( $domain );
+				$trimmed_domain                   = trim( $domain );
 				$this->site_data['alias_domains'] .= $trimmed_domain . ',';
 			}
 		}
@@ -370,7 +379,7 @@ class WordPress extends EE_Site_Command {
 				$this->site_data['php_version'] = 5.6;
 			} elseif ( 7 === $floor ) {
 				$this->site_data['php_version'] = 7.4;
-				$old_version .= ' yet';
+				$old_version                    .= ' yet';
 			} else {
 				EE::error( 'Unsupported PHP version: ' . $this->site_data['php_version'] );
 			}
@@ -565,6 +574,7 @@ class WordPress extends EE_Site_Command {
 			$site = (array) Site::find( $this->site_data['site_url'] );
 			$site = reset( $site );
 			EE::log( json_encode( $site ) );
+
 			return;
 		}
 
@@ -989,7 +999,7 @@ class WordPress extends EE_Site_Command {
 	 */
 	private function create_site( $assoc_args ) {
 
-		$this->level                     = 1;
+		$this->level = 1;
 		try {
 			if ( 'inherit' === $this->site_data['site_ssl'] ) {
 				$this->check_parent_site_certs( $this->site_data['site_url'] );
@@ -1127,7 +1137,7 @@ class WordPress extends EE_Site_Command {
 			$count           = 0;
 			while ( $mysql_unhealthy ) {
 				$mysql_unhealthy = ! \EE::exec( $health_chk );
-				if ( $count++ > 180 ) {
+				if ( $count ++ > 180 ) {
 					break;
 				}
 				sleep( 1 );
