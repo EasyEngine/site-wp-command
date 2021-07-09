@@ -343,7 +343,7 @@ class WordPress extends EE_Site_Command {
 		}
 
 		$this->site_data['site_container_fs_path'] = get_public_dir( $assoc_args );
-		$this->site_data['site_ssl']               = get_value_if_flag_isset( $assoc_args, 'ssl', [ 'le', 'self', 'inherit', 'custom' ], 'le' );
+		$this->site_data['site_ssl']               = get_value_if_flag_isset( $assoc_args, 'ssl', 'le' );
 		if ( 'custom' === $this->site_data['site_ssl'] ) {
 			try {
 				$this->validate_site_custom_ssl( get_flag_value( $assoc_args, 'ssl-key' ), get_flag_value( $assoc_args, 'ssl-crt' ) );
@@ -1439,7 +1439,11 @@ class WordPress extends EE_Site_Command {
 
 		$extra_flags = '--precise';
 		$extra_flags .= ( 'wp' === $this->site_data['app_sub_type'] ) ? '' : ' --network';
-		EE::exec( sprintf( \EE_DOCKER::docker_compose_with_custom() . ' exec php wp search-replace http://%1$s https://%1$s %2$s', $this->site_data['site_url'], $extra_flags ), true, true );
+		$ssl = get_flag_value( $assoc_args, 'ssl' );
+		$from = $ssl === 'on' ? 'http' : 'https';
+		$to = $ssl === 'on' ? 'https' : 'http';
+
+		EE::exec( sprintf( \EE_DOCKER::docker_compose_with_custom() . ' exec php wp search-replace %2$s://%1$s %3$s://%1$s %4$s', $this->site_data['site_url'], $from, $to, $extra_flags ), true, true );
 		EE::success( 'Successfully completed search-replace.' );
 
 		if ( $backup_success ) {
