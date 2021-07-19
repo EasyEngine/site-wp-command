@@ -449,6 +449,18 @@ class WordPress extends EE_Site_Command {
 	}
 
 	/**
+	 * Disable object cache.
+	 */
+	private function disable_object_cache() {
+
+		$redis_plugin_constant    = 'docker-compose exec --user=\'www-data\' php wp config delete --type=variable redis_server';
+		$uninstall_wp_redis_plugin = "docker-compose exec --user='www-data' php wp plugin uninstall wp-redis --deactivate";
+
+		$this->docker_compose_exec( $uninstall_wp_redis_plugin, 'Unable to uninstall wp-redis plugin.' );
+		$this->docker_compose_exec( $redis_plugin_constant, 'Unable to remove redis_server variable from wp-config.' );
+	}
+
+	/**
 	 * Enable page cache.
 	 */
 	private function enable_page_cache() {
@@ -502,6 +514,34 @@ class WordPress extends EE_Site_Command {
 		$this->docker_compose_exec( $activate_nginx_helper, $nginx_helper_fail_msg );
 		$this->docker_compose_exec( $add_plugin_data, $nginx_helper_fail_msg );
 		$this->docker_compose_exec( $add_redis_maxttl, $nginx_helper_fail_msg );
+	}
+
+	/**
+	 * Disable page cache.
+	 */
+	private function disable_page_cache() {
+		$uninstall_nginx_helper = 'docker-compose exec --user=\'www-data\' php wp plugin uninstall nginx-helper --deactivate';
+		$nginx_helper_fail_msg  = 'Unable to uninstall nginx-helper plugin properly.';
+
+		$wp_cli_params = ( 'wp' === $this->site_data['app_sub_type'] ) ? 'option delete' : 'network meta delete 1';
+
+		$delete_hostname_constant = "docker-compose exec --user='www-data' php wp config delete RT_WP_NGINX_HELPER_REDIS_HOSTNAME --type=constant";
+		$delete_port_constant     = "docker-compose exec --user='www-data' php wp config delete RT_WP_NGINX_HELPER_REDIS_PORT --type=constant";
+		$delete_prefix_constant   = "docker-compose exec --user='www-data' php wp config delete RT_WP_NGINX_HELPER_REDIS_PREFIX --type=constant";
+		$delete_cache_key_salt    = "docker-compose exec --user='www-data' php wp config delete WP_CACHE_KEY_SALT --type=constant";
+		$delete_redis_maxttl      = "docker-compose exec --user='www-data' php wp config delete WP_REDIS_MAXTTL --type=constant";
+		$delete_plugin_data       = "docker-compose exec --user='www-data' php wp $wp_cli_params rt_wp_nginx_helper_options";
+
+		$constant_remove_error    = 'Unable to remove %s constant from wp-config.yml';
+		$delete_plugin_data_error = 'Unable to remove rt_wp_nginx_helper_options from options/network meta';
+
+		$this->docker_compose_exec( $uninstall_nginx_helper, $nginx_helper_fail_msg );
+		$this->docker_compose_exec( $delete_hostname_constant, sprintf( $constant_remove_error, 'RT_WP_NGINX_HELPER_REDIS_HOSTNAME' ) );
+		$this->docker_compose_exec( $delete_port_constant, sprintf( $constant_remove_error, 'RT_WP_NGINX_HELPER_REDIS_PORT' ) );
+		$this->docker_compose_exec( $delete_prefix_constant, sprintf( $constant_remove_error, 'RT_WP_NGINX_HELPER_REDIS_PREFIX' ) );
+		$this->docker_compose_exec( $delete_cache_key_salt, sprintf( $constant_remove_error, 'WP_CACHE_KEY_SALT' ) );
+		$this->docker_compose_exec( $delete_plugin_data, sprintf( $constant_remove_error, 'WP_REDIS_MAXTTL' ) );
+		$this->docker_compose_exec( $delete_redis_maxttl, $delete_plugin_data_error );
 	}
 
 	/**
@@ -1445,6 +1485,66 @@ class WordPress extends EE_Site_Command {
 		if ( $backup_success ) {
 			EE::log( "In case something is not working as intended. You can restore your DB from backup file generated before search-replace located at:\n `$backup_location`\nand proceed with search-replace according to your needs." );
 		}
+	}
+
+	/**
+	 * Update cache of a site
+	 *
+	 * @param array|bool $assoc_args Associate arguments passed to update command
+	 */
+	protected function update_cache( $assoc_args )
+	{
+		parent::update_cache( $assoc_args );
+
+		$cache       = get_flag_value( $assoc_args, 'cache', false );
+		$local_cache = get_flag_value( $assoc_args, 'with-local-redis' );
+
+		if ( $cache === 'on' ) {
+			$cache = true;
+		} elseif( $cache === 'off') {
+			$cache = false;
+		}
+
+		$this->site_data->cache_host = $cache ? $local_cache ? 'redis' : 'global-redis' : false;
+		$this->site_data->cache_nginx_browser = $cache;
+		$this->site_data->cache_nginx_fullpage = $cache;
+		$this->site_data->cache_mysql_query = $cache;
+		$this->site_data->cache_app_object = $cache;
+		$this->cache_type = $cache;
+
+		$site_conf_dir           = $this->site_data->site_fs_path . '/config';
+		$site_nginx_default_conf = $site_conf_dir . '/nginx/conf.d/main.conf';
+		$server_name             = implode( ' ', explode( ',', $this->site_data->alias_domains ) );
+		$default_conf_content    = $this->generate_default_conf( $this->site_data->site_type, $this->cache_type, $server_name );
+		$this->fs->dumpFile( $site_nginx_default_conf, $default_conf_content );
+
+		$this->dump_docker_compose_yml( [ 'nohttps' => ! $this->site_data->site_ssl ] );
+
+		$containers = ['nginx', 'php'];
+
+		if ( $local_cache ) {
+			$containers[] = 'redis';
+		}
+
+		chdir( $this->site_data->site_fs_path );
+
+		if ( $cache ) {
+			$this->enable_object_cache();
+			$this->enable_page_cache();
+		} else {
+			$this->disable_object_cache();
+			$this->disable_page_cache();
+		}
+
+		\EE\Site\Utils\stop_site_containers( $this->site_data->site_fs_path, [] );
+		\EE\Site\Utils\start_site_containers( $this->site_data->site_fs_path, $containers );
+
+		$this->site_data->save();
+
+		$action = $cache ? 'Enabled' : 'Disabled';
+		$local_cache_message = $local_cache ? ' with local cache' : '';
+
+		EE::success( $action . ' cache for ' . $this->site_data->site_url . $local_cache_message );
 	}
 
 	/**
